@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CPU 스케줄러</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- 헤더 (전체 너비 고정) -->
+  <div class="header">
+    <img src="https://www.koreatech.ac.kr/images/layout/logo.png"
+         alt="한국기술교육대학교" class="logo"
+         onerror="this.style.display='none'; document.getElementById('logoText').style.display='block'">
+    <span id="logoText" class="logo-text" style="display:none;">KOREATECH</span>
+  </div>
+
+  <div class="layout">
+
+    <!-- 왼쪽 컬럼: 사이드바(스크롤) + 하단버튼(고정) -->
+    <div class="left-col" id="leftCol">
+
+      <!-- 사이드바 (토글 대상) -->
+      <div class="sidebar" id="sidebar">
+        <div class="panel">
+
+          <div class="card algo-card">
+            <div class="section-title">⚙️ Algorithm</div>
+            <select class="algo-select" id="algoSelect">
+              <option>FCFS</option>
+              <option>SJF</option>
+              <option>SRTF</option>
+              <option>Round Robin</option>
+              <option>Priority</option>
+              <option>HRN</option>
+            </select>
+            <div class="tq-row">
+              <label class="tq-label" for="tqInput">Time Quantum</label>
+              <input class="tq-input" type="number" id="tqInput" min="1" value="2" disabled placeholder="quantum">
+            </div>
+          </div>
+
+          <div class="card core-card">
+            <div class="section-title">⚙️ 코어 설정</div>
+            <div class="slider-row">
+              <div class="slider-label"><span>P-core</span><span id="pVal">2</span></div>
+              <input type="range" min="0" max="4" value="2" step="1" id="pSlider">
+            </div>
+            <div class="slider-row">
+              <div class="slider-label"><span>E-core</span><span id="eVal">2</span></div>
+              <input type="range" min="0" max="4" value="2" step="1" id="eSlider">
+            </div>
+            <div class="core-limit-msg" id="coreLimitMsg"></div>
+            <div class="badges" id="badges">
+              <span class="badge badge-p">P 2</span>
+              <span class="badge badge-e">E 2</span>
+            </div>
+          </div>
+
+          <div class="card proc-card">
+            <table class="proc-table proc-table--head">
+              <thead>
+                <tr><th>프로세스</th><th>AT</th><th>BT</th><th></th></tr>
+              </thead>
+            </table>
+            <div id="tableWrapper" class="table-wrapper">
+              <table class="proc-table">
+                <tbody id="procBody"></tbody>
+              </table>
+            </div>
+            <div class="add-row">
+              <input class="add-input" type="text" inputmode="numeric" pattern="[0-9]*" id="inputAT" placeholder="도착시간">
+              <input class="add-input" type="text" inputmode="numeric" pattern="[0-9]*" id="inputBT" placeholder="실행시간">
+              <button class="btn-add" id="addBtn">추가</button>
+            </div>
+            <div class="random-row">
+              <button class="btn-random" id="randBtn1">랜덤 1개</button>
+              <button class="btn-random" id="randBtn15">랜덤 15개</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 토글 화살표 -->
+    <button class="sidebar-toggle" id="sidebarToggle" title="사이드바 열기/닫기">
+      <span id="toggleArrow">&#9664;</span>
+    </button>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="main-content" id="mainContent">
+
+      <!-- 우측 상단 컨트롤 바 -->
+      <div class="top-right-bar">
+
+        <!-- 슬라이드 토글 버튼 -->
+        <div class="mode-toggle" id="modeToggle" onclick="toggleCompare()">
+          <div class="mtog-knob">
+            <span class="mtog-icon" id="mtogIcon">🖥️</span>
+          </div>
+          <span class="mtog-label-off">비교 모드</span>
+          <span class="mtog-label-on">시뮬레이션</span>
+        </div>
+
+        <!-- 문맥 교환 뱃지 -->
+        <div class="ctx-badge" id="ctxBadge">
+          <span class="ctx-badge__icon"></span>
+          <span class="ctx-badge__label">문맥 교환</span>
+          <span class="ctx-badge__val" id="pwVal-ctx">0회</span>
+        </div>
+
+      </div>
+      <!-- 시뮬레이션 영역: 구름/물방울/땅/새싹/레디큐 -->
+      <div class="sim-sky" id="simSky">
+        <div class="ground-block-row" id="groundBlockRow"></div>
+        <div class="ground" id="ground"></div>
+        
+      </div>
+
+      <div class="ready-queue-wrap" id="readyQueue">
+          <div class="rq-track" id="rqTrack"></div>
+          <span class="rq-label">Ready queue</span>
+        </div>
+        
+      <!-- 간트 차트: normal flow -->
+      <div class="gantt-wrap" id="ganttWrap">
+        <div class="gantt-scroll" id="ganttScroll">
+          <div class="gantt-rows" id="ganttRows"></div>
+        </div>
+      </div>
+      <!-- 결과 + 전력 통계: normal flow -->
+      <div class="bottom-stats-wrap" id="bottomStatsWrap">
+        <div class="power-wrap" id="powerWrap">
+          <div class="power-item">
+            <span class="power-icon">⚙️</span>
+            <span class="power-label">성능</span>
+            <span class="power-val" id="pwVal-perf">-</span>
+          </div>
+          <div class="power-item">
+            <span class="power-icon">⚙️</span>
+            <span class="power-label">효율</span>
+            <span class="power-val" id="pwVal-eff">-</span>
+          </div>
+          <div class="power-item">
+            <span class="power-icon">☰</span>
+            <span class="power-label">처리 작업 개수</span>
+            <span class="power-val" id="pwVal-count">-</span>
+          </div>
+          <div class="power-item">
+            <span class="power-icon">➤</span>
+            <span class="power-label">전체 수행 시간</span>
+            <span class="power-val" id="pwVal-time">-</span>
+          </div>
+          <div class="power-item">
+            <span class="power-icon">▦</span>
+            <span class="power-label">평균 응답 시간</span>
+            <span class="power-val" id="pwVal-avg">-</span>
+          </div>
+          <div class="power-item power-item--total">
+            <span class="power-icon">⚡</span>
+            <span class="power-label">전력 통계</span>
+            <span class="power-val" id="pwVal-total">-</span>
+          </div>
+        </div>
+        <div class="result-wrap" id="resultWrap">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>프로세스</th><th>AT</th><th>BT</th>
+                <th>WT</th><th>TT</th><th>NTT</th>
+              </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+        </div>
+        <div class="chart-wrap" id="chartWrap">
+          <div class="chart-item">
+            <div class="chart-title">⚙️ 성능 (work/s)</div>
+            <canvas id="perfCanvas" class="stat-canvas"></canvas>
+          </div>
+          <div class="chart-item">
+            <div class="chart-title">⚡ 효율 (work/W)</div>
+            <canvas id="effCanvas" class="stat-canvas"></canvas>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 하단 버튼: 항상 왼쪽 하단 고정 -->
+  <div class="bottom-bar" id="bottomBar">
+    <div class="bottom-grid">
+      <button class="btn-speed active" id="spd1">x1</button>
+      <button class="btn-speed"        id="spd3">x3</button>
+      <button class="btn-start"        id="startBtn">시작</button>
+      <button class="btn-reset"        id="resetBtn">재설정</button>
+    </div>
+  </div>
+
+
+  <!--비교 모드 오버레이-->
+  <div id="compareOverlay" class="compare-overlay hidden">
+    <div class="compare-modal">
+
+      <!-- 헤더 -->
+      <div class="cmp-header">
+        <span class="cmp-title">알고리즘 비교 모드</span>
+        <button class="cmp-close" onclick="closeCompare()">✕</button>
+      </div>
+
+      <!-- 알고리즘 선택 -->
+      <div class="cmp-setup">
+        <select class="algo-select cmp-algo-sel" id="cmpAlgo1" onchange="updateCmpTQ()">
+          <option>FCFS</option><option>SJF</option><option>SRTF</option>
+          <option>Round Robin</option><option>Priority</option><option>HRN</option>
+        </select>
+        <span class="cmp-vs">VS</span>
+        <select class="algo-select cmp-algo-sel" id="cmpAlgo2" onchange="updateCmpTQ()">
+          <option>FCFS</option><option selected>SJF</option><option>SRTF</option>
+          <option>Round Robin</option><option>Priority</option><option>HRN</option>
+        </select>
+        <div class="cmp-tq-wrap" id="cmpTqWrap" style="display:none;">
+          <label class="cmp-tq-label">Time Quantum</label>
+          <input class="cmp-tq-input" type="number" id="cmpTqInput" min="1" value="2" placeholder="quantum">
+        </div>
+        <button class="btn-run-cmp" onclick="runComparison()">▶ 비교 실행</button>
+      </div>
+
+      <!-- 좌우 패널 -->
+      <div class="cmp-body">
+
+        <!-- 왼쪽 -->
+        <div class="cmp-col">
+          <div class="cmp-algo-label" id="cmpLabel1">FCFS</div>
+          <div class="gantt-wrap cmp-gantt-wrap">
+            <div class="gantt-scroll" id="cmpGanttScroll1">
+              <div class="gantt-rows" id="cmpGantt1"></div>
+            </div>
+          </div>
+          <div class="cmp-stats-wrap" id="cmpStats1"></div>
+        </div>
+
+        <div class="cmp-divider"></div>
+
+        <!-- 오른쪽 -->
+        <div class="cmp-col">
+          <div class="cmp-algo-label" id="cmpLabel2">SJF</div>
+          <div class="gantt-wrap cmp-gantt-wrap">
+            <div class="gantt-scroll" id="cmpGanttScroll2">
+              <div class="gantt-rows" id="cmpGantt2"></div>
+            </div>
+          </div>
+          <div class="cmp-stats-wrap" id="cmpStats2"></div>
+        </div>
+
+      </div>
+
+      <!-- 판정 -->
+      <div id="cmpVerdict" class="cmp-verdict-wrap" style="display:none"></div>
+
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
