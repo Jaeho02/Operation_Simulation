@@ -1,6 +1,6 @@
 // 비교 모드
 const CMP_TICK = 28; //
-
+//
 function runSimulation(algo, procs, numP, numE, tq = 2) {
   if (!procs.length || (numP + numE) === 0) return { blocks: [], stats: {}, summary: {} };
 
